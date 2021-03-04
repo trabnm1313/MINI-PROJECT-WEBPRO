@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="/css/all.css" rel="stylesheet" />
+    <link href="/css/bulma.css" rel="stylesheet" />
+    <script src="/js/all.js"></script>
+    <script src="/js/vue.js"></script>
+    <title>My ToDo List</title>
+  </head>
+  <body>
+    <section class="hero">
+      <div class="hero-body">
+        <p class="title">
+            My ToDo List
+            <span class="icon is-small ml-3" @click="editState('todolistAdd')">
+                <i class="fas fa-plus-circle"></i>
+            </span>
+        </p>
+        <!-- <p class="subtitle">Hero subtitle</p> -->
+      </div>
+    </section>
+    <section id="app">
+      <div class="container">
+        <p class="subtitle my-2">Completed: {{ completedTask }} Tasks</p>
+        <p class="subtitle my-2">Incomplete: {{ inCompleteTask }} Tasks</p>
+        <div class="mt-5" v-for="todolist in todolists">
+          <div class="columns">
+            <div class="column is-12">
+              <label class="title mr-3"> {{ todolist.title }} </label>
+              <span class="icon is-normal" @click="editState(todolist.ID, 'todolistEdit')">
+                  <i class="fas fa-edit"></i>
+              </span>
+              <span class="icon is-normal ml-3" @click="editState(todolist.ID, 'todolistDelete')">
+                  <i class="fas fa-trash-alt"></i>
+              </span>
+            </div>
+          </div>
+          <div class="columns">
+            <div class="column is-8">
+              <!-- Tasks -->
+              <template v-for="task in sortedList(todolist.ID)">
+                <div class="box level py-3 my-2" v-show="task.todolistID == todolist.ID">
+                  <div class="control">
+                    <label class="checkbox">
+                        <input type="checkbox" v-model="task.isComplete" :key="task.taskID"/>
+                        <label :style="[task.isComplete ? taskCompleteStyle : '']" :class="[ task.color=='red' ? 'has-text-danger' : task.color=='green' ? 'has-text-success' : '' ]">{{ task.name }}</label>
+                        <label v-show="task.isFlag"><i class="fas fa-flag" ></i></label>
+                        <label v-show="task.date != ''">(Due by {{ task.date }})</label>
+                    </label>
+                  </div>
+                  <div class="level-right">   
+                    <span class="icon is-small" @click="editState(task.taskID, 'taskEdit')">
+                        <i class="fas fa-edit"></i>
+                    </span>
+                    <span class="icon is-small ml-5" @click="editState((task.taskID), 'taskDelete')">
+                        <i class="fas fa-trash-alt"></i>
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="column is-4">
+              <!-- Filter Card -->
+              <div class="card">
+                <header class="card-header has-background-primary">
+                  <p class="card-header-title">Filters</p>
+                  <p class="card-header-icon">
+                    <span class="card-header-icon icon">
+                      <i class="fas fa-filter"></i>
+                    </span>
+                  </p>
+                </header>
+                <div class="card-content">
+                  <div class="content">
+                    <div class="control">
+                      <label class="checkbox">
+                        <input type="checkbox" v-model="todolist.filterOption.hideCompleted"/>
+                        Hide completed tasks
+                      </label>
+                    </div>
+                    <div class="control">
+                      <label class="checkbox">
+                        <input type="checkbox" v-model="todolist.filterOption.showOnlyFlagged"/>
+                        Show only flagged tasks
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Sort Card -->
+              <div class="card mt-5">
+                <header class="card-header has-background-primary">
+                  <p class="card-header-title">Sort</p>
+                  <p class="card-header-icon">
+                    <span class="card-header-icon icon">
+                      <i class="fas fa-filter"></i>
+                    </span>
+                  </p>
+                </header>
+                <div class="card-content">
+                  <div class="content">
+                    <div class="control">
+                      <label class="checkbox">
+                        <input type="radio" v-model="todolist.sortOption" value="sortAlphabet"/>
+                        Sort alphabetically
+                      </label>
+                    </div>
+                    <div class="control">
+                      <label class="checkbox">
+                        <input type="radio" v-model="todolist.sortOption" value="sortIncomplete"/>
+                        Sort incomplete tasks
+                      </label>
+                    </div>
+                    <div class="control">
+                      <label class="checkbox">
+                        <input type="radio" v-model="todolist.sortOption" value="sortFlagged"/>
+                        Sort flagged task first
+                      </label>
+                    </div>
+                    <div class="control">
+                      <label class="checkbox">
+                        <input type="radio" v-model="todolist.sortOption" value="sortDueDate"/>
+                        Sort by due date (ascending)
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input -->
+        <div class="columns mt-2">
+            <!-- Name -->
+            <div class="column is-3">
+              <div class="field">
+                <div class="control is-expanded">
+                  <input class="input" type="text" placeholder="Task Name" v-model="taskName" :class="[!validated ? 'is-danger' : '']"/>
+                </div>
+              </div>
+            </div>
+            <!-- Todolist -->
+            <div class="column is-2">
+              <div class="field">
+                <div class="control is-expanded">
+                    <div class="select">
+                        <select v-model="todolistID">
+                            <option value="-1" selected disabled>Todolist not selected</option>
+                            <option v-for="todolist in todolists" :value="todolist.ID"> {{ todolist.title }} </option>
+                        </select>
+                    </div>
+                </div>
+              </div>
+            </div>
+            <!-- Date -->
+            <div class="column is-2">
+              <div class="field">
+                <div class="control is-expanded">
+                  <input id="taskDate" class="input" type="date" v-model="taskDate"/>
+                </div>
+              </div>
+            </div>
+            <!-- Flags -->
+            <div class="column is-1">
+              <div class="field">
+                <div class="control is-expanded mt-2">
+                  <label>Flag: </label>
+                  <input id="checkbox" class="radio" type="checkbox" v-model="isFlag"/>
+                </div>
+              </div>
+            </div>
+            <!-- Color -->
+            <div class="column is-2">
+              <div class="field">
+                <div class="control is-expanded mt-2">
+                  <label>Black: </label>
+                  <input name="flag" class="radio" type="radio" value="black" v-model="color"/>
+                  <label>Red: </label>
+                  <input name="flag" class="radio" type="radio" value="red" v-model="color"/>
+                  <label>Green: </label>
+                  <input name="flag" class="radio" type="radio" value="green" v-model="color"/>
+                </div>
+              </div>
+            </div>
+            <!-- Save button -->
+            <div class="column is-2">
+              <p class="control">
+                <a class="button is-info" @click="addTask()"> Save </a>
+              </p>
+            </div>
+          </div>
+
+      </div>
+
+      <!-- Edit Task Modal -->
+      <div :class="['modal', editModal.state ? 'is-active' : '']">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Edit Task</p>
+            <button class="delete" aria-label="close" @click="editModal.state = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Name -->
+            <div class="columns">
+              <div class="column is-8">
+                <input class="input" type="text" placeholder="Task Name" v-model="currentEdit.taskName" :class="[!validated ? 'is-danger' : '']">
+              </div>
+              <div class="column is-4">
+                <div class="select">
+                  <select v-model="currentEdit.todolistID">
+                    <option v-for="todolist in todolists" :value="todolist.ID" :selected="todolist.ID==currentEdit.todolistID">{{ todolist.title }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="columns">
+              <!-- Date -->
+              <div class="column is-4">
+                <input class="input" type="date" v-model="currentEdit.taskDate">
+              </div>
+              <!-- Flag -->
+              <div class="column is-2 mt-2">
+                <label>Flag: </label>
+                <input class="checkbox" type="checkbox" v-model="currentEdit.isFlag">
+              </div>
+              <!-- Color -->
+              <div class="column is-4 mt-2">
+                <label>Black: </label>
+                <input class="radio" type="radio" value="black" v-model="currentEdit.color">
+                <label>Red: </label>
+                <input class="radio" type="radio" value="red" v-model="currentEdit.color">
+                <label>Green: </label>
+                <input class="radio" type="radio" value="green" v-model="currentEdit.color">
+              </div>
+            </div>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" @click="editTask()">Save</button>
+            <button class="button" @click="editModal.state = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Delete Task Modal -->
+      <div :class="['modal', deleteModal.state ? 'is-active' : '']">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <section class="modal-card-body">
+            <label>Are you sure you want to delete "{{ deleteModal.name }}"?</label>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-danger" @click="deleteTask()">Confirm</button>
+            <button class="button" @click="deleteModal.state = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Add Todolist Modal -->
+      <div :class="['modal', todolistAddModal.state ? 'is-active' : '']">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">New List</p>
+            <button class="delete" aria-label="close" @click="todolistAddModal.state = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <input class="input mt-2" type="text" v-model="todolistName">
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-info" @click="addTodolist">Save</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Edit Todolist Modal -->
+      <div :class="['modal', todolistEditModal.state ? 'is-active' : '']">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Edit list</p>
+            <button class="delete" aria-label="close" @click="todolistEditModal.state = false"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Name -->
+            <div class="columns">
+              <div class="column is-12">
+                <input class="input" type="text" placeholder="Task Name" v-model="currentTodolistEdit.title" :class="[!validated ? 'is-danger' : '']">
+              </div>
+            </div>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" @click="editTodolist()">Save</button>
+            <button class="button" @click="todolistEditModal.state = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Delete Todolsit Modal -->
+      <div :class="['modal', todolistDeleteModal.state ? 'is-active' : '']">
+        <div class="modal-background"></div>
+        <div class="modal-card">
+          <section class="modal-card-body">
+            <label>Are you sure you want to delete "{{ todolistDeleteModal.name }}"?</label>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-danger" @click="deleteTodolist()">Confirm</button>
+            <button class="button" @click="todolistDeleteModal.state = false">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+    </section>
+    <script>
+      var app = new Vue({
+        el: "#app",
+        data: {
+        todolists: [],
+        tasks:[],
+        editModal: { state: false, ID: -1},
+        deleteModal: { state: false, ID: -1, name: "" },
+        currentEdit: { taskName: "", taskDate: "" , isFlag: false, color: "", todolistID: "-1" },
+        todolistAddModal: { state: false, ID: -1 },
+        todolistEditModal: { state: false, ID: -1 },
+        todolistDeleteModal: { state: false, ID: -1, name: "" },
+        currentTodolistEdit: { title: "" },
+        
+        //Variable to
+        taskCompleteStyle: {
+        "text-decoration": "line-through"
+        },
+        lastestTaskID: 0,
+        lastestTodolistID: 0,
+
+        //Current Adding Task
+        taskName: "",
+        todolistID: -1,
+        taskDate: "",
+        isFlag: false,
+        color: "black",
+
+        //Current Adding Todolist
+        todolistName: "",
+
+        //Variable for checks
+        validated: true
+        },
+        methods: {
+        editState(ID, modal){
+            let task = this.tasks.filter(task => { return task.taskID == ID})[0]
+            let todolist = this.todolists.filter(todolist => { return todolist.ID == ID })[0]
+            if(modal == "taskEdit"){
+                this.editModal.state = true
+                this.editModal.ID = ID
+                this.currentEdit.taskName = task.name
+                this.currentEdit.taskDate = task.date
+                this.currentEdit.isFlag = task.isFlag
+                this.currentEdit.color = task.color
+                this.currentEdit.todolistID = task.todolistID
+            }else if(modal == "taskDelete"){
+                this.deleteModal.state = true
+                this.deleteModal.ID = task.taskID
+                this.deleteModal.name = task.name
+            }else if(modal == "todolistAdd"){
+                this.todolistAddModal.state = true,
+                this.todolistAddModal.ID = this.lastestTodolistID
+            }else if(modal == "todolistEdit"){
+                this.todolistEditModal.state = true
+                this.todolistEditModal.ID = ID
+                this.currentTodolistEdit.title = todolist.title
+            }else if(modal == "todolistDelete"){
+                this.todolistDeleteModal.state = true
+                this.todolistDeleteModal.ID =  todolist.ID
+                this.todolistDeleteModal.name = todolist.title
+            }
+        },
+        addTask(){
+            let taskObject = {
+                taskID: this.lastestTaskID,
+                todolistID: this.todolistID,
+                name: this.taskName,
+                date: this.taskDate,
+                isFlag: this.isFlag,
+                color: this.color,
+                isComplete: false
+            }
+
+            //Validate todolist
+            if(taskObject.todolistID == -1){
+              alert("Please select todolist.")
+              return false
+            }
+
+            //Validate task name
+            if(taskObject.name == ''){
+                this.validated = false
+                alert("Task name must not be empty.")
+                return false
+            }
+
+            this.validated = true
+            this.tasks.push(taskObject)
+            this.taskName = ""
+            this.taskDate = ""
+            this.lastestTaskID++
+          },
+          editTask(){
+            //Validate task name
+            if(this.currentEdit.taskName == ''){
+              this.validated = false
+              alert("Task name must not be empty.")
+              return false
+            }
+
+            for(let i=0; i<this.tasks.length; i++){
+              if(this.tasks[i].taskID == this.editModal.ID){
+                this.tasks[i].todolistID = this.currentEdit.todolistID
+                this.tasks[i].name = this.currentEdit.taskName
+                this.tasks[i].date = this.currentEdit.taskDate
+                this.tasks[i].isFlag = this.currentEdit.isFlag
+                this.tasks[i].color = this.currentEdit.color
+              }
+            }
+            
+            this.validated = true
+            this.currentEdit.taskName = ""
+            this.currentEdit.todolistID = ""
+            this.editModal.state = false
+            this.editModal.ID = -1
+          },
+          deleteTask(){
+            let findTask = this.tasks.filter(task => { return task.taskID == this.deleteModal.ID})
+            let indexOfTask = this.tasks.indexOf(findTask[0])
+            this.tasks.splice(indexOfTask,  1)
+            this.deleteModal.state = false
+            this.deleteModal.ID = -1
+            this.deleteModal.name = ""
+          },
+          addTodolist(){
+            let todolistObject = {
+                ID: this.lastestTodolistID,
+                title: this.todolistName,
+                filterOption: {
+                  hideCompleted: false,
+                  showOnlyFlagged: false
+                },
+                sortOption: "sortAlphabet"
+            }
+
+            //Validate task name
+            if(todolistObject.title == ''){
+                alert("Todolist name must not be empty.")
+                return false
+            }
+
+            this.validated = true
+            this.todolists.push(todolistObject)
+            this.todolistName = ""
+            this.todolistAddModal.state = false
+            this.lastestTodolistID++
+          },
+          editTodolist(){
+            //Validate todolist name
+            if(this.currentTodolistEdit.title == ''){
+              this.validated = false
+              alert("List name must not be empty.")
+              return false
+            }
+
+            for(let i=0; i<this.todolists.length; i++){
+              if(this.todolists[i].ID == this.todolistEditModal.ID){
+                this.todolists[i].title = this.currentTodolistEdit.title
+              }
+            }
+            
+            this.validated = true
+            this.currentTodolistEdit.title = ""
+            this.todolistEditModal.state = false
+            this.todolistEditModal.ID = -1
+          },
+          deleteTodolist(){
+            let findTodolist = this.todolists.filter(todolist => { return todolist.ID == this.todolistDeleteModal.ID})[0]
+            let indexOfTodolist = this.todolists.indexOf(findTodolist)
+            this.tasks = this.tasks.filter(task => { return task.todolistID != findTodolist.ID})
+            this.todolistID = -1
+            this.todolists.splice(indexOfTodolist,  1)
+            this.todolistDeleteModal.state = false
+            this.todolistDeleteModal.ID = -1
+            this.todolistDeleteModal.name = ""
+          },
+          sortedList(ID){
+            let todolist = this.todolists.filter(todolist => { return todolist.ID == ID })[0]
+
+            //Filtering
+            let filteredTasks
+            if(!todolist.filterOption.hideCompleted && !todolist.filterOption.showOnlyFlagged) filteredTasks = this.tasks
+            else if(todolist.filterOption.hideCompleted && !todolist.filterOption.showOnlyFlagged) filteredTasks = this.tasks.filter(task => { return !task.isComplete })
+            else if(!todolist.filterOption.hideCompleted && todolist.filterOption.showOnlyFlagged) filteredTasks = this.tasks.filter(task => { return task.isFlag })
+            else return this.tasks.filter(task => { return !task.isComplete && task.isFlag })
+
+            //Sorting
+            if(todolist.sortOption == "sortAlphabet"){
+              //Using slice to make a clone/coppy array of this.tasks that filteredTasks refer to
+              //or else vue will loop itself.
+              return filteredTasks.slice().sort((a, b) => {
+                if(a.name < b.name) return -1
+                else if(a.name > b.name) return 1
+                else return 0
+              })
+            }else if(todolist.sortOption == "sortIncomplete"){
+              return filteredTasks.filter(task => { return task.isComplete == false }).concat(filteredTasks.filter(task => { return task.isComplete == true }))
+            }else if(todolist.sortOption == "sortFlagged"){
+              return filteredTasks.filter(task => { return task.isFlag == true }).concat(filteredTasks.filter(task => { return task.isFlag == false }))
+            }else if(todolist.sortOption == "sortDueDate"){
+              return filteredTasks.filter(task => { return task.date != "" }).sort(function (a, b) {
+                if (a.date < b.date) { return -1; }
+                if (a.date > b.date) { return 1; }
+                return 0
+              }).concat(filteredTasks.filter(task => { return task.date == "" }))
+            }
+
+          }
+        },
+        computed: {
+          completedTask(){
+            return this.tasks.filter(task => { return task.isComplete == true}).length
+          },
+          inCompleteTask(){
+            return this.tasks.filter(task => { return task.isComplete == false}).length 
+          },
+          currentSelectedTodolist(){
+            return this.todolists.filter(todolist => { return todolist.ID == this.currentEdit.todolistID})[0]
+          }
+        }
+      })
+
+      const hero = new Vue({
+          el: ".hero",
+          methods:{
+              editState(modal){
+                  app.editState(-1, modal)
+              }
+          }
+      })
+    </script>
+  </body>
+</html>
